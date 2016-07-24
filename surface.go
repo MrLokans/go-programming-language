@@ -4,7 +4,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"net/http"
 )
 
 const (
@@ -14,12 +16,24 @@ const (
 	xy_scale            = width_px / 2 / xy_range // pixels per x or y unit
 	z_scale             = height_px * 0.4         // pixels per Z unit
 	angle               = math.Pi / 6
+	fill_color          = "#00FFAA"
+	stroke_color        = "purple"
 )
 
 var sin30, cos30 = math.Sin(angle), math.Cos(angle)
 
 func main() {
-	fmt.Printf("<svg xmlns='http://www.w3.org/2000/svg' "+
+	http.HandleFunc("/", svg_handler)
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+func svg_handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/svg+xml")
+	color := r.FormValue("color")
+	if color == "" {
+		color = fill_color
+	}
+	fmt.Fprintf(w, "<svg xmlns='http://www.w3.org/2000/svg' "+
 		"style='stroke: grey; fill: white; stroke-with: 0.7' "+
 		"width='%d' height='%d'>", width_px, height_px)
 	for i := 0; i < cells; i++ {
@@ -28,11 +42,11 @@ func main() {
 			bx, by := corner(i, j)
 			cx, cy := corner(i, j+1)
 			dx, dy := corner(i+1, j+1)
-			fmt.Printf("<polygon points='%g,%g %g,%g %g,%g %g,%g' />\n",
-				ax, ay, bx, by, cx, cy, dx, dy)
+			fmt.Fprintf(w, "<polygon points='%g,%g %g,%g %g,%g %g,%g' style='fill: %s; stroke:%s;' />\n",
+				ax, ay, bx, by, cx, cy, dx, dy, color, stroke_color)
 		}
 	}
-	fmt.Printf("</svg>")
+	fmt.Fprintf(w, "</svg>")
 }
 
 func corner(i, j int) (float64, float64) {
