@@ -2,7 +2,16 @@
 
 package main
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+)
 
 const IssuesURL = "https://api.github.com/search/issues"
 
@@ -26,6 +35,38 @@ type User struct {
 	HTMLURL string `json:"html_url"`
 }
 
-func main() {
+func SearchIssues(terms []string) (*IssuesSearchResult, error) {
+	query := url.QueryEscape(strings.Join(terms, " "))
+	resp, err := http.Get(IssuesURL + "?q=" + query)
+	if err != nil {
+		return nil, err
+	}
 
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("search query failed : %s", resp.Status)
+	}
+
+	var result IssuesSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		resp.Body.Close()
+		return nil, err
+	}
+	resp.Body.Close()
+	return &result, nil
+}
+
+func main() {
+	issueText := os.Args[1:]
+
+	result, err := SearchIssues(issueText)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%d issues:\n", result.TotalCount)
+	for _, item := range result.Items {
+		fmt.Printf("#%-5d %9.9s %.55s\n",
+			item.Number, item.User.Login, item.Title)
+	}
 }
