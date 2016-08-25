@@ -1,18 +1,23 @@
 package main
 
 import (
-	"net/http"
-	// "fmt"
-	"encoding/json"
+	// "encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
-	"text/template"
+	"strings"
+	"sync"
+	// "text/template"
 )
 
 const INDEX_FOLDER string = "index"
-const XKCDUrl = "https://xkcd.com/571/info.0.json"
+const XKCDUrl = "https://xkcd.com"
+
+const DOWNLOAD_COUNT = 100
 
 const xkcdTemplate = `
 {{ .Title }} - {{ .Number }}
@@ -23,8 +28,6 @@ Transcript:
 
 Date: {{ .Day }}.{{ .Month }}.{{ .Year }}
 `
-
-// (['img', 'year', 'alt', 'num', 'safe_title', 'news', 'link', 'day', 'month', 'transcript', 'title'])
 
 type XKCDInfo struct {
 	Title           string `json:"title"`
@@ -40,46 +43,61 @@ type XKCDInfo struct {
 	Url             string `json:"link"`
 }
 
+func generateInfoFilePath(indexPath string, pageNumber int) string {
+	var filename = fmt.Sprintf("%d", pageNumber) + ".json"
+	return path.Join(indexPath, filename)
+}
+
+func generateXKCDInfoURL(XKCDNumber int) string {
+	s := []string{XKCDUrl, fmt.Sprintf("%d", XKCDNumber), "info.0.json"}
+	return strings.Join(s, "/")
+}
+
+func downloadMetadata(indexPath string, pageNumber int, wg *sync.WaitGroup) error {
+	url := generateXKCDInfoURL(pageNumber)
+	outputFile := generateInfoFilePath(indexPath, pageNumber)
+	defer wg.Done()
+	log.Printf("Downloading url %s...", url)
+	resp, err := http.Get(url)
+	// defer resp.Body.Close()
+	if err != nil {
+		log.Fatalf("Error downloading comic from %s: %v", url, err)
+		return err
+	}
+	out, err := os.Create(outputFile)
+	if err != nil {
+		log.Fatalf("Error downloading comic from %s: %v", url, err)
+		return err
+	}
+	defer out.Close()
+	io.Copy(out, resp.Body)
+	return nil
+}
+
 func main() {
 
-	var absolutePath = path.Join(".", "index")
-	absolutePath, err := filepath.Abs(absolutePath)
+	var indexPath = path.Join(".", "index")
+	indexPath, err := filepath.Abs(indexPath)
 	if err != nil {
 		log.Fatal("Error creating path")
 		return
 	}
 
-	err = os.MkdirAll(absolutePath, os.ModeDir)
+	err = os.MkdirAll(indexPath, os.ModeDir)
 	if err != nil {
-		log.Fatalf("Error creating dir %s, exiting", absolutePath)
+		log.Fatalf("Error creating dir %s, exiting", indexPath)
 	}
 
-	log.Printf("Path created: %s", absolutePath)
+	log.Printf("Path created: %s", indexPath)
 
-	resp, err := http.Get(XKCDUrl)
+	var wg sync.WaitGroup
 
-	defer resp.Body.Close()
-
-	if err != nil {
-		log.Printf("Error occured downloading url %s", XKCDUrl)
-		return
+	downloads := 0
+	for downloads < DOWNLOAD_COUNT {
+		downloads++
+		wg.Add(1)
+		go downloadMetadata(indexPath, downloads, &wg)
 	}
-
-	var xkcdOutput XKCDInfo
-
-	err = json.NewDecoder(resp.Body).Decode(&xkcdOutput)
-
-	if err != nil {
-		log.Fatalf("Error decoding JSON for url %s: %v", XKCDUrl, err)
-	}
-
-	xkcd, err := template.New("xkcd").Parse(xkcdTemplate)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := xkcd.Execute(os.Stdout, xkcdOutput); err != nil {
-		log.Fatal(err)
-	}
+	wg.Wait()
 
 }
