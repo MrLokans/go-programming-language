@@ -18,8 +18,6 @@ import (
 const INDEX_FOLDER string = "index"
 const XKCDUrl = "https://xkcd.com"
 
-const DOWNLOAD_COUNT = 100
-
 const xkcdTemplate = `
 {{ .Title }} - {{ .Number }}
 Url: {{ .Image }}
@@ -54,6 +52,15 @@ func generateXKCDInfoURL(XKCDNumber int) string {
 	return strings.Join(s, "/")
 }
 
+func createIndexDir(indexPath string) error {
+	err := os.MkdirAll(indexPath, os.ModeDir)
+	if err != nil {
+		log.Fatalf("Error creating dir %s, exiting", indexPath)
+		return err
+	}
+	return nil
+}
+
 func downloadMetadata(indexPath string, pageNumber int, wg *sync.WaitGroup) error {
 	url := generateXKCDInfoURL(pageNumber)
 	outputFile := generateInfoFilePath(indexPath, pageNumber)
@@ -84,14 +91,13 @@ func init() {
 func main() {
 	flag.Parse()
 
-	var indexPath = path.Join(".", "index")
-	indexPath, err := filepath.Abs(indexPath)
+	indexPath, err := filepath.Abs(INDEX_FOLDER)
 	if err != nil {
-		log.Fatal("Error creating path")
+		log.Fatal("Error getting absolute path for %s", indexPath)
 		return
 	}
 
-	err = os.MkdirAll(indexPath, os.ModeDir)
+	err = createIndexDir(indexPath)
 	if err != nil {
 		log.Fatalf("Error creating dir %s, exiting", indexPath)
 	}
