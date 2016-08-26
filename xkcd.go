@@ -2,6 +2,7 @@ package main
 
 import (
 	// "encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -74,7 +75,14 @@ func downloadMetadata(indexPath string, pageNumber int, wg *sync.WaitGroup) erro
 	return nil
 }
 
+var comicCount int
+
+func init() {
+	flag.IntVar(&comicCount, "count", 10, "Number of XKCD comics to process.")
+}
+
 func main() {
+	flag.Parse()
 
 	var indexPath = path.Join(".", "index")
 	indexPath, err := filepath.Abs(indexPath)
@@ -93,7 +101,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	downloads := 0
-	for downloads < DOWNLOAD_COUNT {
+	for downloads < comicCount {
 		downloads++
 		wg.Add(1)
 		go downloadMetadata(indexPath, downloads, &wg)
