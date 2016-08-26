@@ -16,6 +16,7 @@ import (
 )
 
 const INDEX_FOLDER string = "index"
+const DEFAULT_DOWNLOAD_COUNT int = 10
 const XKCDUrl = "https://xkcd.com"
 
 const xkcdTemplate = `
@@ -83,21 +84,23 @@ func downloadMetadata(indexPath string, pageNumber int, wg *sync.WaitGroup) erro
 }
 
 var comicCount int
+var indexDir string
 
 func init() {
-	flag.IntVar(&comicCount, "count", 10, "Number of XKCD comics to process.")
+	flag.IntVar(&comicCount, "count", DEFAULT_DOWNLOAD_COUNT, "Number of XKCD comics to process.")
+	flag.StringVar(&indexDir, "dir", INDEX_FOLDER, "Output folder")
 }
 
 func main() {
 	flag.Parse()
 
-	indexPath, err := filepath.Abs(INDEX_FOLDER)
+	indexPath, err := filepath.Abs(indexDir)
 	if err != nil {
 		log.Fatal("Error getting absolute path for %s", indexPath)
 		return
 	}
 
-	err = createIndexDir(indexPath)
+	err = createIndexDir(indexDir)
 	if err != nil {
 		log.Fatalf("Error creating dir %s, exiting", indexPath)
 	}
